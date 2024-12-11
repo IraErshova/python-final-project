@@ -5,5 +5,5 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Access environment variables
-BOT_API = os.getenv('BOT_API')
-SPOONACULAR_API_KEY = os.getenv('SPOONACULAR_API_KEY')
+BOT_API = os.getenv("BOT_API")
+SPOONACULAR_API_KEY = os.getenv("SPOONACULAR_API_KEY")

@@ -52,12 +52,16 @@ async def regular_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     elif text == constants.WINE_CATEGORY:
         message = "Send me a meal you are going to have and I recommend you a wine"
 
-    await update.message.reply_text(f"Do you want to {text.lower()}? I would love to help you with that!\n{message}")
+    await update.message.reply_text(
+        f"Do you want to {text.lower()}? I would love to help you with that!\n{message}"
+    )
 
     return constants.TYPING_REPLY
 
 
-async def received_information(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def received_information(
+        update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
     """Get the info based on user's input."""
     user_data = context.user_data
     text = update.message.text
@@ -109,17 +113,23 @@ def main() -> None:
         states={
             constants.CHOOSING_CATEGORY: [
                 MessageHandler(
-                    filters.Regex(f"^({constants.RECIPE_CATEGORY}|{constants.WINE_CATEGORY})$"), regular_choice
+                    filters.Regex(
+                        f"^({constants.RECIPE_CATEGORY}|{constants.WINE_CATEGORY})$"
+                    ),
+                    regular_choice,
                 )
             ],
             constants.TYPING_CHOICE: [
                 MessageHandler(
-                    filters.TEXT & ~(filters.COMMAND | filters.Regex(f"^{constants.DONE}$")), regular_choice
+                    filters.TEXT
+                    & ~(filters.COMMAND | filters.Regex(f"^{constants.DONE}$")),
+                    regular_choice,
                 )
             ],
             constants.TYPING_REPLY: [
                 MessageHandler(
-                    filters.TEXT & ~(filters.COMMAND | filters.Regex(f"^{constants.DONE}$")),
+                    filters.TEXT
+                    & ~(filters.COMMAND | filters.Regex(f"^{constants.DONE}$")),
                     received_information,
                 )
             ],

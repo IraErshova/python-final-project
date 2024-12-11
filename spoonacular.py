@@ -1,14 +1,5 @@
 import requests
-import os
-
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
-
-# Access environment variables
-SPOONACULAR_API_KEY = os.getenv('SPOONACULAR_API_KEY')
-
+from config import SPOONACULAR_API_KEY
 
 async def search_recipe_by_ingredients(ingredients: str):
     # ingredients - string - A comma-separated list of ingredients that the recipes should contain.
@@ -17,7 +8,7 @@ async def search_recipe_by_ingredients(ingredients: str):
     payload = {'ingredients': ingredients, 'number': 3, 'ranking': 2}
     headers = {'x-api-key': SPOONACULAR_API_KEY}
     r = requests.get('https://api.spoonacular.com/recipes/findByIngredients', params=payload, headers=headers)
-    return r.json()
+    return format_recipe_response(r.json())
 
 
 async def search_wine_by_meal(meal: str):
@@ -29,7 +20,6 @@ async def search_wine_by_meal(meal: str):
 
 
 def format_wine_response(response) -> str:
-    print(response)
     default_message = "Could not find anything, try again with another search"
 
     if not response or not isinstance(response, dict):
@@ -38,3 +28,29 @@ def format_wine_response(response) -> str:
         return default_message
     if response.get('pairingText'):
         return response.get('pairingText')
+    else:
+        return default_message
+
+
+def format_recipe_response(response) -> str:
+    print(response)
+    if not list or not isinstance(response, list) or len(response) == 0:
+        return "Could not find anything, try again with another search"
+
+    formatted_recipes = "Neat! Look what I've found:\n\n"
+    for recipe in response:
+        recipe_title = recipe['title']
+        missed_ingredients = [ingredient['name'] for ingredient in recipe['missedIngredients']]
+        used_ingredients = [ingredient['original'] for ingredient in recipe['usedIngredients']]
+
+        # Format the recipe details
+        formatted_recipe = f"Recipe Title: {recipe_title}\n"
+        formatted_recipe += "Missed Ingredients:\n"
+        formatted_recipe += "\n".join(f"- {ingredient}" for ingredient in missed_ingredients)
+        formatted_recipe += "\nUsed Ingredients:\n"
+        formatted_recipe += "\n".join(f"- {ingredient}" for ingredient in used_ingredients)
+        formatted_recipe += "\n\n"  # Separate recipes with an extra newline
+
+        formatted_recipes += formatted_recipe
+
+    return formatted_recipes

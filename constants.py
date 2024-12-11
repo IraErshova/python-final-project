@@ -1,0 +1,4 @@
+CHOOSING_CATEGORY, TYPING_REPLY, TYPING_CHOICE = range(3)
+RECIPE_CATEGORY = "Find a recipe"
+WINE_CATEGORY = "Find a wine"
+DONE = "Done"

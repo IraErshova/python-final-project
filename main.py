@@ -1,10 +1,9 @@
-import os
 import logging
-import recipes
+import spoonacular
+import constants
 
-from rich import print_json
-from dotenv import load_dotenv
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
+from config import BOT_API
+from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -13,12 +12,6 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
-
-# Load environment variables from .env file
-load_dotenv()
-
-# Access environment variables
-BOT_API = os.getenv('BOT_API')
 
 # Enable logging
 logging.basicConfig(
@@ -29,23 +22,13 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
-CHOOSING, TYPING_REPLY, TYPING_CHOICE = range(3)
 
-find_recipe_category = "Find a recipe"
-find_wine_category = "Find a wine"
-done = "Done"
-reply_keyboard = [
-    [find_recipe_category, find_wine_category],
-    [done],
-]
-
-markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
-
-
-def facts_to_str(user_data: dict[str, str]) -> str:
-    """Helper function for formatting the gathered user info."""
-    facts = [f"{key} - {value}" for key, value in user_data.items()]
-    return "\n".join(facts).join(["\n", "\n"])
+def build_markup():
+    reply_keyboard = [
+        [constants.RECIPE_CATEGORY, constants.WINE_CATEGORY],
+        [constants.DONE],
+    ]
+    return ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -53,74 +36,68 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(
         "Hi! This is YourRecipiesBot and I help you to find a perfect recipe based on ingredients you have in your fridge. "
         "Or maybe you want to choose a wine for your meal, just let me know and I'll help you!",
-        reply_markup=markup,
+        reply_markup=build_markup(),
     )
 
-    return CHOOSING
+    return constants.CHOOSING_CATEGORY
 
 
 async def regular_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Ask the user for info about the selected predefined choice."""
+    """Ask user for info based on the selected option."""
     text = update.message.text
     context.user_data["choice"] = text
     message = ""
-    if text == find_recipe_category:
+    if text == constants.RECIPE_CATEGORY:
         message = "Send me a list of ingredients you have in your fridge, please"
-    elif text == find_wine_category:
+    elif text == constants.WINE_CATEGORY:
         message = "Send me a meal you are going to have and I recommend you a wine"
 
-    await update.message.reply_text(f"Do you want to {text.lower()}? I would love to help you with that! \n {message}")
+    await update.message.reply_text(
+        f"Do you want to {text.lower()}? I would love to help you with that!\n{message}"
+    )
 
-    return TYPING_REPLY
+    return constants.TYPING_REPLY
 
 
-async def received_information(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Store info provided by user and ask for the next category."""
+async def received_information(
+        update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+    """Get the info based on user's input."""
     user_data = context.user_data
     text = update.message.text
     category = user_data["choice"]
     user_data[category] = text
     del user_data["choice"]
-    if category == find_recipe_category and text:
-        return await show_recipe(update, text)
-    elif category == find_wine_category:
-        return await show_wine(update, text)
+    if category == constants.RECIPE_CATEGORY and text:
+        return await get_recipe(update, text)
+    elif category == constants.WINE_CATEGORY:
+        return await get_wine(update, text)
 
 
-async def show_recipe(update: Update, search_text: str):
-    response = await recipes.search_recipe_by_ingredients(search_text)
-    count = len(response)
-
-    await update.message.reply_text(
-        f"Neat! Look, I've found {count} recipes",
-        reply_markup=markup,
-    )
-
-    return CHOOSING
-
-
-async def show_wine(update: Update, search_text: str):
-    response = await recipes.search_wine_by_meal(search_text)
+async def get_recipe(update: Update, search_text: str):
+    response = await spoonacular.search_recipe_by_ingredients(search_text)
 
     await update.message.reply_text(
-        f"Neat! Look what I've found",
-        reply_markup=markup,
+        response,
+        reply_markup=build_markup(),
     )
 
-    return CHOOSING
+    return constants.CHOOSING_CATEGORY
+
+
+async def get_wine(update: Update, search_text: str):
+    response = await spoonacular.search_wine_by_meal(search_text)
+    await update.message.reply_text(
+        response,
+        reply_markup=build_markup(),
+    )
+
+    return constants.CHOOSING_CATEGORY
 
 
 async def done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Display the gathered info and end the conversation."""
+    """end the conversation."""
     user_data = context.user_data
-    if "choice" in user_data:
-        del user_data["choice"]
-
-    await update.message.reply_text(
-        f"I learned these facts about you: {facts_to_str(user_data)}Until next time!",
-        reply_markup=ReplyKeyboardRemove(),
-    )
-
     user_data.clear()
     return ConversationHandler.END
 
@@ -130,28 +107,34 @@ def main() -> None:
     # Create the Application and pass it your bot's token.
     application = Application.builder().token(BOT_API).build()
 
-    # Add conversation handler with the states CHOOSING, TYPING_CHOICE and TYPING_REPLY
+    # Add conversation handler with the states CHOOSING_CATEGORY, TYPING_CHOICE and TYPING_REPLY
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
-            CHOOSING: [
+            constants.CHOOSING_CATEGORY: [
                 MessageHandler(
-                    filters.Regex(f"^({find_recipe_category}|{find_wine_category})$"), regular_choice
+                    filters.Regex(
+                        f"^({constants.RECIPE_CATEGORY}|{constants.WINE_CATEGORY})$"
+                    ),
+                    regular_choice,
                 )
             ],
-            TYPING_CHOICE: [
+            constants.TYPING_CHOICE: [
                 MessageHandler(
-                    filters.TEXT & ~(filters.COMMAND | filters.Regex(f"^{done}$")), regular_choice
+                    filters.TEXT
+                    & ~(filters.COMMAND | filters.Regex(f"^{constants.DONE}$")),
+                    regular_choice,
                 )
             ],
-            TYPING_REPLY: [
+            constants.TYPING_REPLY: [
                 MessageHandler(
-                    filters.TEXT & ~(filters.COMMAND | filters.Regex(f"^{done}$")),
+                    filters.TEXT
+                    & ~(filters.COMMAND | filters.Regex(f"^{constants.DONE}$")),
                     received_information,
                 )
             ],
         },
-        fallbacks=[MessageHandler(filters.Regex(f"^{done}$"), done)],
+        fallbacks=[MessageHandler(filters.Regex(f"^{constants.DONE}$"), done)],
     )
 
     application.add_handler(conv_handler)

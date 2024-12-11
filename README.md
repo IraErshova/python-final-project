@@ -36,6 +36,6 @@ cp .env-example .env
 7. Run `main.py` file
 
 ```bash
-    python3.12 main.py
+python3.12 main.py
 ```
 
